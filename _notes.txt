@@ -1,0 +1,96 @@
+
+                                         Application Server 1
+                                        +====================+
+                                        |                    |
+                                        |   192.168.2.2      |
+                                        |                    |
+                                        +====================+
+                                                /
+                                               /
+                                              /
+                    eth3:                    /
+                   10.0.1.11                /     eth1: 192.168.2.1
+                           +============(eth1)==+
+                           |                    |
+    client =============(eth3)  Your Router     |
+   10.0.1.100              |                    |
+                           +============(eth2)==+
+                                            \    eth2: 172.64.3.1
+                                             \
+                                              \
+                                               \
+                                        +====================+
+                                        |                    |
+                                        |  172.64.3.10       |
+                                        |                    |
+                                        +====================+
+                                         Application Server 2
+
+> cat ~/cs144_lab3/IP_CONFIG
+server1 192.168.2.2
+server2 172.64.3.10
+client    10.0.1.100
+sw0-eth1 192.168.2.1
+sw0-eth2 172.64.3.1
+sw0-eth3 10.0.1.1
+
+> cat ~/cs144_lab3/rtable
+10.0.1.100  10.0.1.100  255.255.255.255 eth3
+192.168.2.2 192.168.2.2 255.255.255.255 eth1
+172.64.3.10  172.64.3.10  255.255.255.255 eth2
+
+
+two parts:
+	ip forwarding
+	handling ARP (address resolution)
+
+files:
+sr_router.h
+sr_util.c
+sr_util.h
+sr_arpcache.h
+
+
+TTL 
+	- time to live
+	- counter that is decremented to prevent looping
+	- if TTL = 0, the packet is discarded
+
+Hop
+	- hops are number of jumps through interfaces during the path of a data packet
+
+ICMP
+	- internet control message protocol
+	- used for ping and traceroute
+
+UDP
+	- user datagram protocol
+
+TCP 
+	- transmission control protocol
+
+ARP
+	- address resolution protocol
+	- ip to MAC
+
+
+
+IP forwarding:
+	given an IP packet that is not destined for one of our interfaces:
+		- sanity check the packet
+			- greater than min length
+			- correct checksum
+		- decrement the TTL (modify header)
+		- recompute the checksum (with new header)
+		- match packet destination IP address with the longest prefix match in routing table
+		- check ARP cache for the next-hop MAC address corresponding to the next-hop IP.
+			- how do i find the next-hop IP??
+		- if MAC address is found, send the packet to it
+		- if a new ARP hasn't been recieved within the last 1 second
+			- send an ARP requiest for the next-hop IP
+			- add the packet to the queue (queue consists of packets waiting for ARP requests)
+	
+		* if an error occurs anywhere above, send an ICMP message back to the sender notifying them of an error
+
+ARP
+	- cached ARP entries times out after 15 seconds
