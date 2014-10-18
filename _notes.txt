@@ -37,9 +37,9 @@ sw0-eth3 10.0.1.1
 > cat ~/cs144_lab3/rtable
 
 Network Destination		Gateway			Netmask/Genmask		Interface/iface
-10.0.1.100 			 	10.0.1.100  	255.255.255.255 	eth3
-192.168.2.2 			192.168.2.2 	255.255.255.255		eth1
-172.64.3.10  			172.64.3.10  	255.255.255.255 	eth2
+10.0.1.100 			 	10.0.1.100  	255.255.255.255 	eth3  (10.0.1.1)
+192.168.2.2 			192.168.2.2 	255.255.255.255		eth1  (192.168.2.1)
+172.64.3.10  			172.64.3.10  	255.255.255.255 	eth2  (172.64.3.1)
 
 
 two parts:
@@ -96,3 +96,202 @@ IP forwarding:
 
 ARP
 	- cached ARP entries times out after 15 seconds
+
+----------------------------------------
+
+
+
+
+
+protocol encapsulation:
+
+
+Application layer:			[SSH, FTP, HTTP]   [DNS, HALO]       [traceroute]
+Transport layer: 			[     TCP      ]   [   UDP   ]         v^
+Network layer:				[          IP                ]  <->  [ ICMP ] 
+Link layer:					[    ARP, device drivers     ]
+Physical layer: 			[ copper, optical, radio waves ] 
+
+
+
+- Receive an IP packet from transport layer
+- Convert to ARP on link layer
+- Send to physical layer
+
+
+handle packets:
+	- if IP packet
+		- means its to an application or server
+
+	- if ARP packet
+		- means its to an router interface
+
+
+// TO DOOD
+- sr_handlepacket
+- handle_arpreq
+- sr_arpcache_sweepreqs
+
+
+____________
+
+
+
+sr_handlepacket(uint8_t* p = packet,char* interface)
+
+	if  packet length < sizeof Ethernet:
+		return error;
+	if getinterface (input) == NULL (misc. error checking):
+		return error;
+
+	do endianess operations
+
+	if packet == type ARP {ethertype(packet) == ethertype_arp}:
+		- make function to handle received ARP PACKETS:
+			- error check for arp packet size, and other misc;
+
+			// if statements on arp packet's operation
+			- if packet->ops == request {arp_op_request}:
+				- log msg "ARP request recieved. sending ARP reply."
+
+				- create a reply using malloc and mencpy
+
+				- | ethernet header | ARP header | 
+
+				- this packet does not require app data
+
+				- send the packet (sr_send_packet)
+
+				- free reply packet
+
+
+			- if packet->ops == reply {arp_op_reply}:
+				- if packet target ip == interface ip:
+					
+					- insert into arp_cache; set return to 'requestPointer'
+
+					- while (requestPointer->packets != null)
+						- memcpy ethernet header
+						- send packet
+						- increment list of packet (requestPointer->packets->next;)
+						- free current packet, interface, pointer;
+					- while end
+					- destroy arp request
+			- if else
+				- log "receieved ARP reply, but no request"
+	if end
+	if packet == type IP (ethertype_ip)
+		- make function to handle received IP PACKETS:
+			- error check on sizeof IP packet size;
+
+			- confirm IP packet's checksum
+
+			- if (network destination is us):
+				// handle icmp packet (MAKE new function)
+					- confrim ICMP header checksum
+
+					- if (icmp type == echo request)
+						- contruct reply packet
+						- copy ip header fields
+						- copy icmp fields
+						- copy old payload into the new one
+						- update checksum
+						- send packet WITH arp headers.
+			- else
+				// IP FORWARDING, ignore until ping begins to work.
+
+
+	
+
+// link layer functionality to send provider packets
+// if there is an ARP cache entry for the desitination, 
+// the packet is sent immediately.
+// Otherwise, the function will send an ARP request to the 
+// interface.
+new function linkArpAndSendPacket
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

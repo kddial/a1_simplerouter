@@ -1,3 +1,5 @@
+
+; client ping -c 1 server1
 ---------------------1000 method sr_handlepacket 
 ---------------------1010 receiving interface eth3 
 ETHERNET header:
