@@ -157,7 +157,7 @@ void sr_handlepacket(struct sr_instance* sr,
       /* ARP Reply */
       else if (ntohs(arp_hdr->ar_op) == arp_op_reply)
       {
-        printf("\n Received ARP reply. ** TO DO **********\n");
+        LOG("Received ARP reply. \n");
         /* Insert into ARP cache */
         /* Send outstanding packets from request */
         /* Destroy request */
