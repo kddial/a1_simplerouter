@@ -90,21 +90,12 @@ void sr_handlepacket(struct sr_instance* sr,
 
   printf("*** -> Received packet of length %d \n",len);
 
-  /* fill in code here */
-
-  /* 
-  printf("---------------------1000 method sr_handlepacket \n");
-  printf("---------------------1010 receiving interface %s \n", interface);
-  print_hdrs(packet, len);
-  */
-
-  /* error handling */
+  /* Error handling */
   if (len < sizeof(sr_ethernet_hdr_t))
   {
     LOG("Invalid packet, insufficient length.\n");
-    return;
+    return -1;
   }
-
   struct sr_if* iface = sr_get_interface(sr, interface);
   if (iface == 0)
   {
@@ -117,7 +108,7 @@ void sr_handlepacket(struct sr_instance* sr,
     if (len < (sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t)))
     {
       LOG("Invalid ARP packet, insufficient length.\n");
-      return;
+      return -1;
     }
 
     /* ARP header */
@@ -130,43 +121,10 @@ void sr_handlepacket(struct sr_instance* sr,
       if (ntohs(arp_hdr->ar_op) == arp_op_request) 
       {
         /* Contruct ARP reply */
-        LOG("Received ARP request.\n");
+        LOG("Received ARP request. Reply is being sent.\n");
         uint8_t* reply_arp_packet = (uint8_t *) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
         sr_ethernet_hdr_t* reply_ethernet_hdr = (sr_ethernet_hdr_t*)reply_arp_packet;
         sr_arp_hdr_t* reply_arp_hdr = (sr_arp_hdr_t*)(reply_arp_packet + sizeof(sr_ethernet_hdr_t));
-
-
-
-
-
-        LOG("\n -------=======================================================\n");
-
-        LOG("\n --------INTERFACE begin\n");
-        sr_print_if(iface);
-        LOG("\n--------INTERFACE end\n");
-
-        LOG("\n --------ARP HEADER begin\n");
-        print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));
-        LOG("\n --------ARP HEADER end\n");
-
-        LOG("\n-----------ethernet begin \n");
-        sr_ethernet_hdr_t *ehdr = (sr_ethernet_hdr_t *)packet;
-        print_addr_eth(ehdr->ether_dhost);        
-        print_addr_eth(ehdr->ether_shost);
-/*        print_addr_eth(packet);*/
-        LOG("\n-----------ethernet end \n");
-
-        LOG("\n --------reply ethernet destination from homeboy DD: \n");
-        print_addr_eth(arp_hdr->ar_sha);
-
-        LOG("\n --------reply ethernet source from homeboy SS: \n");
-        print_addr_eth(iface->addr);
-        
-        LOG("\n!!REQUEST!!");
-        print_hdr_eth(packet);
-        LOG("!!REPLY!!");
-        print_hdr_eth((uint8_t*)reply_ethernet_hdr);
-
 
         /* Ethernet header */
         memcpy(reply_ethernet_hdr->ether_dhost, arp_hdr->ar_sha, ETHER_ADDR_LEN);
@@ -177,30 +135,43 @@ void sr_handlepacket(struct sr_instance* sr,
         reply_arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
         reply_arp_hdr->ar_pro = htons(ethertype_ip);
         reply_arp_hdr->ar_hln = ETHER_ADDR_LEN;
-        reply_arp_hdr->ar_pln = PROTOCOL_ADDR_LEN;
+        reply_arp_hdr->ar_pln = IP_ADDR_LEN;
         reply_arp_hdr->ar_op = htons(arp_op_reply);
         memcpy(reply_arp_hdr->ar_sha, iface->addr, ETHER_ADDR_LEN);
         reply_arp_hdr->ar_sip = iface->ip;
         memcpy(reply_arp_hdr->ar_tha, arp_hdr->ar_sha, ETHER_ADDR_LEN);
         reply_arp_hdr->ar_tip = arp_hdr->ar_sip;
 
+        /* Send reply packet */
+        sr_send_packet(sr, (uint8_t*)reply_arp_packet, (sizeof(sr_ethernet_hdr_t) 
+          + sizeof(sr_arp_hdr_t)), interface);
+
         LOG("\n!!REQUEST!!");
         print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));
         LOG("!!REPLY!!");
         print_hdr_arp((uint8_t*)reply_arp_hdr);
 
-        /* Send reply packet */
-        sr_send_packet(sr, (uint8_t*)reply_arp_packet, (sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t)), interface);
+        free(reply_arp_packet);
       }
 
       /* ARP Reply */
       else if (ntohs(arp_hdr->ar_op) == arp_op_reply)
       {
-        printf("Received ARP reply.\n");
+        printf("\n Received ARP reply. ** TO DO **********\n");
+        /*sr_arpcache_dump(&sr->cache);*/
+        /* Insert into ARP cache */
+        /*struct sr_arpreq* arp_request_pointer = sr_arpcache_insert(&sr->cache, iface->addr, iface->ip);*/
+        /*      struct sr_arpreq* requestPointer = sr_arpcache_insert(
+               &sr->cache, packet->ar_sha, ntohl(packet->ar_sip));*/
+        /* Send outstanding packets from request */
+        /* Destroy request */
       }
     }
-
-    /* ARP request */
+  }
+  /* IP packet */
+  else if (ethertype(packet) == ethertype_ip)
+  {
+    LOG("\nIP PACKET! ************* \n");
   }
 
 
