@@ -25,12 +25,17 @@
 #include "sr_utils.h"
 
 /*
- * Macro for Error outputs
+ * Macros
  */
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
+#define TTL (100)
+ #define ICMP_ECHO_REQUEST (8)
+ #define ICMP_ECHO_REPLY (0)
 
-
-
+/*
+ * Static variables
+ */
+static uint16_t id_counter = 0;
 
 
 
@@ -146,11 +151,6 @@ void sr_handlepacket(struct sr_instance* sr,
         sr_send_packet(sr, (uint8_t*)reply_arp_packet, (sizeof(sr_ethernet_hdr_t) 
           + sizeof(sr_arp_hdr_t)), interface);
 
-/*        LOG("\n!!REQUEST!!");
-        print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));
-        LOG("!!REPLY!!");
-        print_hdr_arp((uint8_t*)reply_arp_hdr);*/
-
         free(reply_arp_packet);
       }
 
@@ -158,11 +158,7 @@ void sr_handlepacket(struct sr_instance* sr,
       else if (ntohs(arp_hdr->ar_op) == arp_op_reply)
       {
         printf("\n Received ARP reply. ** TO DO **********\n");
-        /*sr_arpcache_dump(&sr->cache);*/
         /* Insert into ARP cache */
-        /*struct sr_arpreq* arp_request_pointer = sr_arpcache_insert(&sr->cache, iface->addr, iface->ip);*/
-        /*      struct sr_arpreq* requestPointer = sr_arpcache_insert(
-               &sr->cache, packet->ar_sha, ntohl(packet->ar_sip));*/
         /* Send outstanding packets from request */
         /* Destroy request */
       }
@@ -171,11 +167,6 @@ void sr_handlepacket(struct sr_instance* sr,
   /* IP packet */
   else if (ethertype(packet) == ethertype_ip)
   {
-    LOG("\nIP PACKET! ************* \n");
-    print_hdrs(packet, len);
-    LOG("\n INTERFACE LIST ********* \n");
-    sr_print_if_list(sr);
-
     /* Error handling */
     if (len < (sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)))
     {
@@ -217,11 +208,16 @@ void sr_handlepacket(struct sr_instance* sr,
       /* Handle ICMP */
       if(ip_packet->ip_p == ip_protocol_icmp){
 
+        /* Error handling */
+        if (len < (sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)
+          + sizeof(sr_icmp_hdr_t)))
+        {
+          LOG("Invalid ICMP packet, insufficient length.\n");
+          return;
+        }
+
         sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t*)(packet 
           + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-
-        /* TO REMOVE */
-        print_hdr_icmp((uint8_t*)icmp_hdr);
 
         /* Authenticate ICMP checksum */
         temp_checksum = icmp_hdr->icmp_sum;
@@ -234,45 +230,63 @@ void sr_handlepacket(struct sr_instance* sr,
         icmp_hdr->icmp_sum = temp_checksum;
 
         /* Check if ICMP is an echo request (8) */
-        if (icmp_hdr->icmp_type == 8)
+        if (icmp_hdr->icmp_type == ICMP_ECHO_REQUEST)
         {
           LOG("Received echo request. Sending reply.\n");
 
+          /* Construct reply packet */
+          uint8_t* reply_packet = malloc(len);
+          sr_ethernet_hdr_t* reply_eth_header = (sr_ethernet_hdr_t*)reply_packet;
+          sr_ip_hdr_t* reply_ip_header = (sr_ip_hdr_t*)(reply_packet + sizeof(sr_ethernet_hdr_t));
+          sr_icmp_hdr_t* reply_icmp_header = (sr_icmp_hdr_t*)(reply_packet 
+                                            + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
 
+          /* Ethernet header */
+          memcpy(reply_eth_header->ether_shost, iface->addr, ETHER_ADDR_LEN);
+          reply_eth_header->ether_type = ntohs(ethertype_ip);
+
+          /* IP header */
+          reply_ip_header->ip_v = ip_packet->ip_v;
+          reply_ip_header->ip_hl = ip_packet->ip_hl;
+          reply_ip_header->ip_tos = ip_packet->ip_tos;
+          reply_ip_header->ip_len = ip_packet->ip_len;
+          reply_ip_header->ip_id = htons(id_counter);
+          id_counter++;
+          reply_ip_header->ip_off = ip_packet->ip_off;
+          reply_ip_header->ip_ttl = TTL;
+          reply_ip_header->ip_p = ip_protocol_icmp;
+          reply_ip_header->ip_sum = 0;
+          reply_ip_header->ip_src = ip_packet->ip_dst;
+          reply_ip_header->ip_dst = ip_packet->ip_src;
+          reply_ip_header->ip_sum = cksum(reply_ip_header, sizeof(sr_ip_hdr_t));
+
+
+          /* ICMP header */
+          memcpy(reply_icmp_header, icmp_hdr, icmp_length);
+          reply_icmp_header->icmp_type = ICMP_ECHO_REPLY;
+          reply_icmp_header->icmp_code = 0;
+          reply_icmp_header->icmp_sum = 0;
+          reply_icmp_header->icmp_sum = cksum(reply_icmp_header, icmp_length);
+
+          /* Send reply packet */
+          sr_send_packet(sr, reply_packet, len, interface);
+
+          free(reply_packet);
         }
         /* Handle unexpected packet */
         else
         {
           LOG("Received unexpected ICMP packet.\n");
         }
-
-
-
-
-
       }
       /* Send ICMP type 3, port unreachable */
-      /*
       else
       {
 
       }
-      */
-
-
-
     }
     /* Forward destination IP packet */
-    else {
-      
-    }
-
-
-
-
   }
-
-
 }/* end sr_ForwardPacket */
 
 
