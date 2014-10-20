@@ -132,6 +132,7 @@ struct sr_ip_hdr
     uint32_t ip_src, ip_dst;	/* source and dest address */
   } __attribute__ ((packed)) ;
 typedef struct sr_ip_hdr sr_ip_hdr_t;
+#define PROTOCOL_ADDR_LEN 4;
 
 /* 
  *  Ethernet packet header prototype.  Too many O/S's define this differently.

@@ -141,35 +141,26 @@ sr_handlepacket(uint8_t* p = packet,char* interface)
 
 	if  packet length < sizeof Ethernet:
 		return error;
-	if getinterface (input) == NULL (misc. error checking):
+	if getInterface (input) == NULL (misc. error checking):
 		return error;
 
 	do endianess operations
 
-	if packet == type ARP {ethertype(packet) == ethertype_arp}:
+	if packet == type ARP  // (ethertype(packet) == ethertype_arp):
 		- make function to handle received ARP PACKETS:
 			- error check for arp packet size, and other misc;
 
-			// if statements on arp packet's operation
 			- if packet->ops == request {arp_op_request}:
 				- log msg "ARP request recieved. sending ARP reply."
-
 				- create a reply using malloc and mencpy
-
 				- | ethernet header | ARP header | 
-
 				- this packet does not require app data
-
 				- send the packet (sr_send_packet)
-
 				- free reply packet
-
 
 			- if packet->ops == reply {arp_op_reply}:
 				- if packet target ip == interface ip:
-					
 					- insert into arp_cache; set return to 'requestPointer'
-
 					- while (requestPointer->packets != null)
 						- memcpy ethernet header
 						- send packet
@@ -183,7 +174,6 @@ sr_handlepacket(uint8_t* p = packet,char* interface)
 	if packet == type IP (ethertype_ip)
 		- make function to handle received IP PACKETS:
 			- error check on sizeof IP packet size;
-
 			- confirm IP packet's checksum
 
 			- if (network destination is us):
@@ -199,6 +189,9 @@ sr_handlepacket(uint8_t* p = packet,char* interface)
 						- send packet WITH arp headers.
 			- else
 				// IP FORWARDING, ignore until ping begins to work.
+	if end
+sr_handlepacket end
+
 
 
 	
