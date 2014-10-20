@@ -94,7 +94,7 @@ void sr_handlepacket(struct sr_instance* sr,
   if (len < sizeof(sr_ethernet_hdr_t))
   {
     LOG("Invalid packet, insufficient length.\n");
-    return -1;
+    return;
   }
   struct sr_if* iface = sr_get_interface(sr, interface);
   if (iface == 0)
@@ -108,7 +108,7 @@ void sr_handlepacket(struct sr_instance* sr,
     if (len < (sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t)))
     {
       LOG("Invalid ARP packet, insufficient length.\n");
-      return -1;
+      return;
     }
 
     /* ARP header */
@@ -146,10 +146,10 @@ void sr_handlepacket(struct sr_instance* sr,
         sr_send_packet(sr, (uint8_t*)reply_arp_packet, (sizeof(sr_ethernet_hdr_t) 
           + sizeof(sr_arp_hdr_t)), interface);
 
-        LOG("\n!!REQUEST!!");
+/*        LOG("\n!!REQUEST!!");
         print_hdr_arp(packet + sizeof(sr_ethernet_hdr_t));
         LOG("!!REPLY!!");
-        print_hdr_arp((uint8_t*)reply_arp_hdr);
+        print_hdr_arp((uint8_t*)reply_arp_hdr);*/
 
         free(reply_arp_packet);
       }
@@ -172,6 +172,104 @@ void sr_handlepacket(struct sr_instance* sr,
   else if (ethertype(packet) == ethertype_ip)
   {
     LOG("\nIP PACKET! ************* \n");
+    print_hdrs(packet, len);
+    LOG("\n INTERFACE LIST ********* \n");
+    sr_print_if_list(sr);
+
+    /* Error handling */
+    if (len < (sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)))
+    {
+      LOG("Invalid IP packet, insufficient length.\n");
+      return;
+    }
+
+    /* Authenticate checksum */
+    sr_ip_hdr_t* ip_packet = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
+    uint16_t temp_checksum = ip_packet->ip_sum;
+    ip_packet->ip_sum = 0;
+
+    if (temp_checksum != cksum(ip_packet, sizeof(sr_ip_hdr_t))){
+      LOG("Invalid IP packet, incorrect checksum.\n");
+      return;
+    }
+    ip_packet->ip_sum = temp_checksum;
+
+    /* Check if the destination IP belongs to any of our interfaces */
+    int destination_ip_belong_to_us = 0;
+    struct sr_if* if_walker = 0;
+    if(sr->if_list != 0)
+    {
+      if_walker = sr->if_list;
+
+      while(if_walker)
+      {
+        if (if_walker->ip == ip_packet->ip_dst)
+        {
+          destination_ip_belong_to_us = 1;
+        }
+        if_walker = if_walker->next;
+      }
+    }
+
+    /* Handle destination IP packet */
+    if (destination_ip_belong_to_us == 1){
+
+      /* Handle ICMP */
+      if(ip_packet->ip_p == ip_protocol_icmp){
+
+        sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t*)(packet 
+          + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+
+        /* TO REMOVE */
+        print_hdr_icmp((uint8_t*)icmp_hdr);
+
+        /* Authenticate ICMP checksum */
+        temp_checksum = icmp_hdr->icmp_sum;
+        icmp_hdr->icmp_sum = 0;
+        int icmp_length = len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t);
+        if (temp_checksum != cksum(icmp_hdr, icmp_length)){
+          LOG("Invalid ICMP, incorrect checksum.\n");
+          return;
+        }
+        icmp_hdr->icmp_sum = temp_checksum;
+
+        /* Check if ICMP is an echo request (8) */
+        if (icmp_hdr->icmp_type == 8)
+        {
+          LOG("Received echo request. Sending reply.\n");
+
+
+        }
+        /* Handle unexpected packet */
+        else
+        {
+          LOG("Received unexpected ICMP packet.\n");
+        }
+
+
+
+
+
+      }
+      /* Send ICMP type 3, port unreachable */
+      /*
+      else
+      {
+
+      }
+      */
+
+
+
+    }
+    /* Forward destination IP packet */
+    else {
+      
+    }
+
+
+
+
   }
 
 
