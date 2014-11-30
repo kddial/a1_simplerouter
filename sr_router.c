@@ -94,16 +94,18 @@ void sr_handlepacket(struct sr_instance* sr,
   print_hdrs(packet, len);
 
   /* Error handling */
-/*  if (len < sizeof(sr_ethernet_hdr_t))
+  if (len < sizeof(sr_ethernet_hdr_t))
   {
     LOG("Invalid packet, insufficient length.\n");
     return;
   }
+
   struct sr_if* iface = sr_get_interface(sr, interface);
+  
   if (iface == 0)
   {
     LOG("Invalid interface, interface not found.\n");
-  }*/
+  }
 
 
 
