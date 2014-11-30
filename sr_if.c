@@ -187,8 +187,8 @@ void sr_print_if(struct sr_if* iface)
 
     ip_addr.s_addr = iface->ip;
 
-    Debug("%s\tHWaddr - ",iface->name);
+    Debug("%s\tHWaddr",iface->name);
     DebugMAC(iface->addr);
     Debug("\n");
-    Debug("\tinet addr - %s\n",inet_ntoa(ip_addr));
+    Debug("\tinet addr %s\n",inet_ntoa(ip_addr));
 } /* -- sr_print_if -- */

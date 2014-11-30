@@ -24,18 +24,12 @@
 #include "sr_arpcache.h"
 #include "sr_utils.h"
 
-/*
- * Macros
- */
-#define LOG(...) fprintf(stderr, __VA_ARGS__)
-#define TTL (100)
- #define ICMP_ECHO_REQUEST (8)
- #define ICMP_ECHO_REPLY (0)
 
-/*
- * Static variables
- */
-static uint16_t id_counter = 0;
+/*---------------------------------------------------------------------
+ * Macros
+ *---------------------------------------------------------------------*/
+#define LOG(...) fprintf(stderr, __VA_ARGS__)
+
 
 
 
@@ -95,8 +89,12 @@ void sr_handlepacket(struct sr_instance* sr,
 
   printf("*** -> Received packet of length %d \n",len);
 
+  /* fill in code here */
+  LOG("------------------ handle packet begin ------------------\n");
+  print_hdrs(packet, len);
+
   /* Error handling */
-  if (len < sizeof(sr_ethernet_hdr_t))
+/*  if (len < sizeof(sr_ethernet_hdr_t))
   {
     LOG("Invalid packet, insufficient length.\n");
     return;
@@ -105,11 +103,30 @@ void sr_handlepacket(struct sr_instance* sr,
   if (iface == 0)
   {
     LOG("Invalid interface, interface not found.\n");
-  }
+  }*/
 
-  /* ARP packet */
-  if (ethertype(packet) == ethertype_arp)
+
+
+}/* end sr_ForwardPacket */
+
+
+
+
+
+void sr_handle_arp_packet(struct sr_instance* sr,
+        uint8_t * packet/* lent */,
+        unsigned int len,
+        char* interface/* lent */)
   {
+
+
+    struct sr_if* iface = sr_get_interface(sr, interface);
+
+
+
+
+
+
     if (len < (sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t)))
     {
       LOG("Invalid ARP packet, insufficient length.\n");
@@ -164,184 +181,11 @@ void sr_handlepacket(struct sr_instance* sr,
       }
     }
   }
-  /* IP packet */
-  else if (ethertype(packet) == ethertype_ip)
-  {
-    /* Error handling */
-    if (len < (sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)))
-    {
-      LOG("Invalid IP packet, insufficient length.\n");
-      return;
-    }
 
-    /* Authenticate checksum */
-    sr_ip_hdr_t* ip_packet = (sr_ip_hdr_t*)(packet + sizeof(sr_ethernet_hdr_t));
-    uint16_t temp_checksum = ip_packet->ip_sum;
-    ip_packet->ip_sum = 0;
 
-    if (temp_checksum != cksum(ip_packet, sizeof(sr_ip_hdr_t))){
-      LOG("Invalid IP packet, incorrect checksum.\n");
-      return;
-    }
-    ip_packet->ip_sum = temp_checksum;
-
-    /* Check if the destination IP belongs to any of our interfaces */
-    int destination_ip_belong_to_us = 0;
-    struct sr_if* if_walker = 0;
-    if(sr->if_list != 0)
-    {
-      if_walker = sr->if_list;
-
-      while(if_walker)
-      {
-        if (if_walker->ip == ip_packet->ip_dst)
-        {
-          destination_ip_belong_to_us = 1;
-        }
-        if_walker = if_walker->next;
-      }
-    }
-
-    /* Handle destination IP packet */
-    if (destination_ip_belong_to_us == 1){
-
-      /* Handle ICMP */
-      if(ip_packet->ip_p == ip_protocol_icmp){
-
-        /* Error handling */
-        if (len < (sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t)
-          + sizeof(sr_icmp_hdr_t)))
-        {
-          LOG("Invalid ICMP packet, insufficient length.\n");
-          return;
-        }
-
-        sr_icmp_hdr_t* icmp_hdr = (sr_icmp_hdr_t*)(packet 
-          + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-
-        /* Authenticate ICMP checksum */
-        temp_checksum = icmp_hdr->icmp_sum;
-        icmp_hdr->icmp_sum = 0;
-        int icmp_length = len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t);
-        if (temp_checksum != cksum(icmp_hdr, icmp_length)){
-          LOG("Invalid ICMP, incorrect checksum.\n");
-          return;
-        }
-        icmp_hdr->icmp_sum = temp_checksum;
-
-        /* Check if ICMP is an echo request (8) */
-        if (icmp_hdr->icmp_type == ICMP_ECHO_REQUEST)
-        {
-          LOG("Received echo request. Sending reply.\n");
-
-          /* Construct reply packet */
-          uint8_t* reply_packet = malloc(len);
-          sr_ethernet_hdr_t* reply_eth_header = (sr_ethernet_hdr_t*)reply_packet;
-          sr_ip_hdr_t* reply_ip_header = (sr_ip_hdr_t*)(reply_packet + sizeof(sr_ethernet_hdr_t));
-          sr_icmp_hdr_t* reply_icmp_header = (sr_icmp_hdr_t*)(reply_packet 
-                                            + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
-
-          /* Ethernet header */
-          memcpy(reply_eth_header->ether_shost, iface->addr, ETHER_ADDR_LEN);
-          reply_eth_header->ether_type = ntohs(ethertype_ip);
-
-          /* IP header */
-          reply_ip_header->ip_v = ip_packet->ip_v;
-          reply_ip_header->ip_hl = ip_packet->ip_hl;
-          reply_ip_header->ip_tos = ip_packet->ip_tos;
-          reply_ip_header->ip_len = ip_packet->ip_len;
-          reply_ip_header->ip_id = htons(id_counter);
-          id_counter++;
-          reply_ip_header->ip_off = ip_packet->ip_off;
-          reply_ip_header->ip_ttl = TTL;
-          reply_ip_header->ip_p = ip_protocol_icmp;
-          reply_ip_header->ip_sum = 0;
-          reply_ip_header->ip_src = ip_packet->ip_dst;
-          reply_ip_header->ip_dst = ip_packet->ip_src;
-          reply_ip_header->ip_sum = cksum(reply_ip_header, sizeof(sr_ip_hdr_t));
-
-
-          /* ICMP header */
-          memcpy(reply_icmp_header, icmp_hdr, icmp_length);
-          reply_icmp_header->icmp_type = ICMP_ECHO_REPLY;
-          reply_icmp_header->icmp_code = 0;
-          reply_icmp_header->icmp_sum = 0;
-          reply_icmp_header->icmp_sum = cksum(reply_icmp_header, icmp_length);
-
-          /* Send reply packet */
-          sr_send_packet(sr, reply_packet, len, interface);
-
-          free(reply_packet);
-        }
-        /* Handle unexpected packet */
-        else
-        {
-          LOG("Received unexpected ICMP packet.\n");
-        }
-      }
-      /* Send ICMP type 3, port unreachable */
-      else
-      {
-
-      }
-    }
-    /* Forward destination IP packet */
-  }
-}/* end sr_ForwardPacket */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void sr_handle_ip_packet(struct sr_instance* sr,
+        uint8_t * packet/* lent */,
+        unsigned int len,
+        char* interface/* lent */)
+{
+}

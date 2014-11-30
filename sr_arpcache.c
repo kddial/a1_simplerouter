@@ -18,7 +18,6 @@
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
     /* Fill this in */
-    /* TO DOOD */
 }
 
 /* You should not need to touch the rest of this code. */

@@ -6,7 +6,7 @@
 
    Pseudocode for use of these structures follows.
 
-   ------------
+   --
 
    # When sending packet to next_hop_ip
    entry = arpcache_lookup(next_hop_ip)
@@ -18,9 +18,8 @@
        req = arpcache_queuereq(next_hop_ip, packet, len)
        handle_arpreq(req)
 
-   ------------
+   --
 
-   TO DOOD 
    The handle_arpreq() function is a function you should write, and it should
    handle sending ARP requests if necessary:
 
@@ -35,7 +34,7 @@
                req->sent = now
                req->times_sent++
 
-   ------------
+   --
 
    The ARP reply processing code should move entries from the ARP request
    queue to the ARP cache:
@@ -47,7 +46,7 @@
        send all packets on the req->packets linked list
        arpreq_destroy(req)
 
-   ------------
+   --
 
    To meet the guidelines in the assignment (ARP requests are sent every second
    until we send 5 ARP requests, then we send ICMP host unreachable back to
