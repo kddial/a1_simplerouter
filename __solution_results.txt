@@ -1,0 +1,58 @@
+ <-- Ready to process packets --> 
+--------- 1000 HANDLE PACKET begin ---------
+ETHERNET header:
+	destination: FF:FF:FF:FF:FF:FF
+	source: 3E:F9:10:41:C9:20
+	type: 2054
+ARP header
+	hardware type: 1
+	protocol type: 2048
+	hardware address length: 6
+	protocol address length: 4
+	opcode: 1
+	sender hardware address: 3E:F9:10:41:C9:20
+	sender ip address: 10.0.1.100
+	target hardware address: 00:00:00:00:00:00
+	target ip address: 10.0.1.1
+Received ARP request. Sending ARP reply.
+--------- 1000 HANDLE PACKET begin ---------
+ETHERNET header:
+	destination: CE:3B:81:5E:70:22
+	source: 3E:F9:10:41:C9:20
+	type: 2048
+IP header:
+	version: 4
+	header length: 5
+	type of service: 0
+	length: 84
+	id: 59342
+	fragment flag: DF
+	fragment offset: 0
+	TTL: 64
+	protocol: 1
+	checksum: 13720
+	source: 10.0.1.100
+	destination: 172.64.3.1
+ICMP header:
+	type: 8
+	code: 0
+	checksum: 58450
+Received ICMP echo request packet. Sending ICMP echo reply.
+ARPing 10.0.1.100 on eth3
+--------- 1000 HANDLE PACKET begin ---------
+ETHERNET header:
+	destination: CE:3B:81:5E:70:22
+	source: 3E:F9:10:41:C9:20
+	type: 2054
+ARP header
+	hardware type: 1
+	protocol type: 2048
+	hardware address length: 6
+	protocol address length: 4
+	opcode: 2
+	sender hardware address: 3E:F9:10:41:C9:20
+	sender ip address: 10.0.1.100
+	target hardware address: CE:3B:81:5E:70:22
+	target ip address: 10.0.1.1
+-------------------- ARP CAHCE 900 --------------------
+Received ARP reply, sending all queued packets.

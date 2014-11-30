@@ -1,0 +1,24 @@
+
+
+handle packet:
+	if packet == arp:
+		if arp_operation == request
+			if arp->target ip == interface->ip
+				// this packet is a request, send a reply
+				send reply packet:
+					ethernet header
+					arp header
+		if arp_operation == reply
+			if arp->target ip == interface->ip
+				// this packet is a reply, save to arp_cahce, send outstanding packets
+
+				insert to arp_cache
+				cycle through requestPackets and send them to the new destination
+				free the requestPackets
+	end
+				
+
+
+
+
+	if packet == ip:
