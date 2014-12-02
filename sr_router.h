@@ -15,7 +15,6 @@
 
 #include "sr_protocol.h"
 #include "sr_arpcache.h"
-#include "sr_rt.h"
 
 /* we dont like this debug , but what to do for varargs ? */
 #ifdef _DEBUG_
@@ -70,10 +69,10 @@ void sr_init(struct sr_instance* );
 void sr_handlepacket(struct sr_instance* , uint8_t * , unsigned int , char* );
 void sr_handle_arp_packet(struct sr_instance* , uint8_t * , unsigned int , char* , struct sr_if*);
 void sr_handle_ip_packet(struct sr_instance* , uint8_t * , unsigned int , char* , struct sr_if*);
-void sr_send_packet_link_arp(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
+void sr_send_packet_link_arp(struct sr_instance* sr, uint8_t * ,
    unsigned int len, char* interface, struct sr_rt* route);
 struct sr_rt* sr_get_ip_packet_route(struct sr_instance* sr, uint32_t dest_addr);
-static int get_mask_length(uint32_t mask);
+int get_mask_length(uint32_t mask);
 
 /* -- sr_if.c -- */
 void sr_add_interface(struct sr_instance* , const char* );

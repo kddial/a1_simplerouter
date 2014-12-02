@@ -199,7 +199,7 @@ void sr_handle_arp_packet(struct sr_instance* sr,
             ((sr_ethernet_hdr_t*) current_packet->buf),
             arp_hdr->ar_sha, ETHER_ADDR_LEN);
 
-          sr_send_packet(sr, current_packet->buf, current_packet->len, current_packet->iface);
+          sr_send_packet(sr, (uint8_t*)current_packet->buf, current_packet->len, current_packet->iface);
 
            /* Iterate to the next packet */
           request_pointer->packets = request_pointer->packets->next;
@@ -383,7 +383,7 @@ struct sr_rt* sr_get_ip_packet_route(struct sr_instance* sr, uint32_t dest_addr)
 /**
  * Get the mask length
  */
-static int get_mask_length(uint32_t mask)
+int get_mask_length(uint32_t mask)
 {
    int ret = 0;
    uint32_t bit_iterator = 0x80000000;
@@ -397,9 +397,10 @@ static int get_mask_length(uint32_t mask)
    return ret;
 }
 
-void sr_send_packet_link_arp(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
+void sr_send_packet_link_arp(struct sr_instance* sr, uint8_t * eth_packet,
    unsigned int len, char* interface, struct sr_rt* route)
 {
+  sr_ethernet_hdr_t* packet = (sr_ethernet_hdr_t*) eth_packet;
   uint32_t next_hop_ip_addr;
   struct sr_arpentry* arp_entry;
 
@@ -417,7 +418,7 @@ void sr_send_packet_link_arp(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
     /* Arp cache found, send packet */
     printf("------------arp cache found-------------\n");
     memcpy(packet->ether_dhost, arp_entry->mac, ETHER_ADDR_LEN);
-    sr_send_packet(sr, packet, len, interface);
+    sr_send_packet(sr, (uint8_t*)packet, len, interface);
     free(arp_entry);
   }
   else
@@ -426,7 +427,7 @@ void sr_send_packet_link_arp(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
     printf("----------arp cache NOT found---------\n");
 
     struct sr_arpreq* arp_request_ptr = sr_arpcache_queuereq(
-      &sr->cache, next_hop_ip_addr, packet, len, interface);
+      &sr->cache, next_hop_ip_addr, (uint8_t*)packet, len, interface);
 
     if (arp_request_ptr->times_sent == -1)
     {
