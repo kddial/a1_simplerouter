@@ -1,4 +1,5 @@
 
+client ping -c 1 172.64.3.1
 
 handle packet:
 	if packet == arp:
@@ -8,17 +9,42 @@ handle packet:
 				send reply packet:
 					ethernet header
 					arp header
-		if arp_operation == reply
+*!		if arp_operation == reply
 			if arp->target ip == interface->ip
 				// this packet is a reply, save to arp_cahce, send outstanding packets
 
 				insert to arp_cache
 				cycle through requestPackets and send them to the new destination
 				free the requestPackets
-	end
-				
-
-
-
-
+	end arp
 	if packet == ip:
+		if packet->ip belogs to any interface->ip
+			// handle ip packet
+			if packet == icmp protocol
+				if packet == icmp echo request
+					// handle icmp echo request
+					contruct reply:
+						IP header
+						icmp header
+					- get_ip_route
+*					- send_packet_link_arp
+			else
+*				// received non-icmp, send ICMP port unreachable
+				contruct ICMP port 3 not reachable reply
+				send packet:
+					- get_ip_route
+					- send_packet_link_arp
+		else
+			// forward ip packet
+*			- redude TTL and break if 0
+			- forward to get_ip_route()
+	end ip
+
+*
+function get_ip_route():
+	longest prefix matching
+
+*
+function send_packet_link_arp():
+	check arp cache for mac to ip link
+	send packet to ip
