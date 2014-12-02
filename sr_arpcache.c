@@ -75,6 +75,9 @@ struct sr_arpreq *sr_arpcache_queuereq(struct sr_arpcache *cache,
         req->ip = ip;
         req->next = cache->requests;
         cache->requests = req;
+
+        /* Set times_sent to -1 as an indicator for a new arp request */
+        req->times_sent = -1;
     }
     
     /* Add the packet to the list of packets for this request */

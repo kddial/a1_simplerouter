@@ -25,7 +25,7 @@
 #include "sr_utils.h"
 
 /**********
- * Macros and static variables
+ * Macros, static variables, privte functions
  ***********/
 #define TTL (100)
 #define ICMP_ECHO_REQUEST (8)
@@ -239,7 +239,8 @@ void sr_handle_ip_packet(struct sr_instance* sr,
   uint16_t temp_checksum = ip_packet->ip_sum;
   ip_packet->ip_sum = 0;
 
-  if (temp_checksum != cksum(ip_packet, sizeof(sr_ip_hdr_t))){
+  if (temp_checksum != cksum(ip_packet, sizeof(sr_ip_hdr_t)))
+  {
     printf("Invalid IP packet, incorrect checksum.\n");
     return;
   }
@@ -284,7 +285,8 @@ void sr_handle_ip_packet(struct sr_instance* sr,
       temp_checksum = icmp_hdr->icmp_sum;
       icmp_hdr->icmp_sum = 0;
       int icmp_length = len - sizeof(sr_ethernet_hdr_t) - sizeof(sr_ip_hdr_t);
-      if (temp_checksum != cksum(icmp_hdr, icmp_length)){
+      if (temp_checksum != cksum(icmp_hdr, icmp_length))
+      {
         printf("Invalid ICMP, incorrect checksum.\n");
         return;
       }
@@ -328,14 +330,18 @@ void sr_handle_ip_packet(struct sr_instance* sr,
         reply_icmp_header->icmp_sum = 0;
         reply_icmp_header->icmp_sum = cksum(reply_icmp_header, icmp_length);
 
-       printf("---------------icmp echo reply packet -------------- \n");
-       print_hdrs(reply_packet, len);
+        printf("---------------icmp echo reply packet -------------- \n");
+        print_hdrs(reply_packet, len);
 
+        /* remvove print later */
+        sr_print_routing_table(sr);
 
 
         /* Send reply packet */
-        sr_send_packet(sr, reply_packet, len, interface);
-
+        sr_send_packet_link_arp(sr, 
+          reply_packet, len, interface, 
+          sr_get_ip_packet_route(sr, ntohl(ip_packet->ip_src))
+        );
         free(reply_packet);
       }
 
@@ -345,3 +351,108 @@ void sr_handle_ip_packet(struct sr_instance* sr,
 
   printf("------------------ IP packet end ------------------\n");
 }
+
+
+
+struct sr_rt* sr_get_ip_packet_route(struct sr_instance* sr, uint32_t dest_addr)
+{
+  struct sr_rt* route_walker = sr->routing_table;
+  struct sr_rt* ret = NULL;
+  int network_mask_length = -1;
+
+  while (route_walker != NULL)
+  {
+    /* Find longest prefix match */
+    if (get_mask_length(route_walker->mask.s_addr) > network_mask_length)
+    {
+      /* Check if destination matches */
+      if ((dest_addr & route_walker->mask.s_addr) 
+        == ((ntohl(route_walker->dest.s_addr)) & route_walker->mask.s_addr))
+      {
+        printf("---------- longest prefix match found ------------\n");
+        sr_print_routing_entry(route_walker);
+        ret = route_walker;
+        network_mask_length = get_mask_length(route_walker->mask.s_addr);
+      }
+    }
+    route_walker = route_walker->next;
+  }
+  return ret;
+}
+
+/**
+ * Get the mask length
+ */
+static int get_mask_length(uint32_t mask)
+{
+   int ret = 0;
+   uint32_t bit_iterator = 0x80000000;
+   
+   while ((bit_iterator != 0) && ((bit_iterator & mask) != 0))
+   {
+      bit_iterator >>= 1;
+      ret++;
+   }
+   
+   return ret;
+}
+
+void sr_send_packet_link_arp(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
+   unsigned int len, char* interface, struct sr_rt* route)
+{
+  uint32_t next_hop_ip_addr;
+  struct sr_arpentry* arp_entry;
+
+  printf("--------------arp dump-------------\n");
+  sr_arpcache_dump(&sr->cache);
+
+
+  printf("------------arp cahch lookup-------------\n");
+  /* Find gateway IP for arp cahce lookup */
+  next_hop_ip_addr = ntohl(route->gw.s_addr);
+  arp_entry = sr_arpcache_lookup(&sr->cache, next_hop_ip_addr);
+
+  if (arp_entry != NULL)
+  {
+    /* Arp cache found, send packet */
+    printf("------------arp cache found-------------\n");
+    memcpy(packet->ether_dhost, arp_entry->mac, ETHER_ADDR_LEN);
+    sr_send_packet(sr, packet, len, interface);
+    free(arp_entry);
+  }
+  else
+  {
+    /* Arp cache not found, create an ARP request */
+    printf("----------arp cache NOT found---------\n");
+
+    struct sr_arpreq* arp_request_ptr = sr_arpcache_queuereq(
+      &sr->cache, next_hop_ip_addr, packet, len, interface);
+
+    if (arp_request_ptr->times_sent == -1)
+    {
+      /* New ARP request */
+
+
+      arp_request_ptr->times_sent = 1;
+      arp_request_ptr->sent = time(NULL);
+    }
+  }
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
