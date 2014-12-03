@@ -301,14 +301,17 @@ void sr_handle_ip_packet(struct sr_instance* sr,
 
         /* Construct reply packet */
         uint8_t* reply_packet = malloc(len);
-        sr_ethernet_hdr_t* reply_eth_header = (sr_ethernet_hdr_t*)reply_packet;
+/*        sr_ethernet_hdr_t* reply_eth_header = (sr_ethernet_hdr_t*)reply_packet; */
         sr_ip_hdr_t* reply_ip_header = (sr_ip_hdr_t*)(reply_packet + sizeof(sr_ethernet_hdr_t));
         sr_icmp_hdr_t* reply_icmp_header = (sr_icmp_hdr_t*)(reply_packet 
                                           + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
 
         /* Ethernet header */
+        /* constuct later??? */
+        /*
         memcpy(reply_eth_header->ether_shost, iface->addr, ETHER_ADDR_LEN);
         reply_eth_header->ether_type = ntohs(ethertype_ip);
+*/
 
         /* IP header */
         reply_ip_header->ip_v = ip_packet->ip_v;
@@ -333,15 +336,15 @@ void sr_handle_ip_packet(struct sr_instance* sr,
         reply_icmp_header->icmp_sum = cksum(reply_icmp_header, icmp_length);
 
         printf("---------------icmp echo reply packet -------------- \n");
-        print_hdrs(reply_packet, len);
+   print_hdr_ip(reply_packet + sizeof(sr_ethernet_hdr_t));
+   print_hdr_icmp(reply_packet + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
 
-        /* remvove print later */
-        sr_print_routing_table(sr);
+    sr_print_routing_entry(sr_get_ip_packet_route(sr, ntohl(ip_packet->ip_src)));
 
 
         /* Send reply packet */
         sr_send_packet_link_arp(sr, 
-          reply_packet, len, interface, 
+          (sr_ethernet_hdr_t*) reply_packet, len, interface,
           sr_get_ip_packet_route(sr, ntohl(ip_packet->ip_src))
         );
         free(reply_packet);
@@ -353,6 +356,116 @@ void sr_handle_ip_packet(struct sr_instance* sr,
 
   printf("------------------ IP packet end ------------------\n");
 }
+
+
+
+void sr_send_packet_link_arp(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
+   unsigned int len, char* interface, struct sr_rt* route)
+{
+  uint32_t next_hop_ip_addr;
+  struct sr_arpentry* arp_entry;
+
+  printf("------------arp cahch lookup-------------\n");
+  /* Set ethernet source addr */
+  struct sr_if* request_iface = sr_get_interface(sr, interface);
+  struct sr_if* route_iface = sr_get_interface(sr, route->interface);
+  memcpy(packet->ether_shost, route_iface->addr, ETHER_ADDR_LEN);
+  packet->ether_type = ntohs(ethertype_ip);
+
+  /* Find gateway IP for arp cahce lookup */
+  next_hop_ip_addr = ntohl(route->gw.s_addr);
+  arp_entry = sr_arpcache_lookup(&sr->cache, next_hop_ip_addr);
+
+
+  if (arp_entry != NULL)
+  {
+    /* Arp cache found, send packet */
+    printf("------------arp cache found-------------\n");
+    memcpy(packet->ether_dhost, arp_entry->mac, ETHER_ADDR_LEN);
+    sr_send_packet(sr, (uint8_t*)packet, len, route_iface->name);
+    free(arp_entry);
+  }
+  else
+  {
+    /* Arp cache not found */
+    printf("----------arp cache NOT found---------\n");
+
+    struct sr_arpreq* arp_request_entry = sr_arpcache_queuereq(
+      &sr->cache, next_hop_ip_addr, (uint8_t*)packet, len, route->interface);
+
+
+    if (arp_request_entry->times_sent == -1)
+    {
+
+
+      /* Contruct and send a new ARP request */
+      uint8_t* request_arp_packet = (uint8_t *) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+      sr_ethernet_hdr_t* request_ethernet_hdr = (sr_ethernet_hdr_t*)request_arp_packet;
+      sr_arp_hdr_t* request_arp_hdr = (sr_arp_hdr_t*)(request_arp_packet + sizeof(sr_ethernet_hdr_t));
+
+      /* Ethernet header */
+      /* Destination addr is set to FF:FF:FF:FF:FF:FF */
+
+
+      /*memcpy(((sr_ethernet_hdr_t*) packet)->ether_dhost, ethernet_broadcast_addr, ETHER_ADDR_LEN);
+ */
+      memcpy(request_ethernet_hdr->ether_dhost, ethernet_broadcast_addr, ETHER_ADDR_LEN);
+      memcpy(request_ethernet_hdr->ether_shost, request_iface->addr, ETHER_ADDR_LEN);
+      request_ethernet_hdr->ether_type = htons(ethertype_arp);
+
+      /* ARP Header */
+      request_arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
+      request_arp_hdr->ar_pro = htons(ethertype_ip);
+      request_arp_hdr->ar_hln = ETHER_ADDR_LEN;
+      request_arp_hdr->ar_pln = IP_ADDR_LEN;
+      request_arp_hdr->ar_op = htons(arp_op_request);
+      memcpy(request_arp_hdr->ar_sha, route_iface->addr, ETHER_ADDR_LEN);
+      request_arp_hdr->ar_sip = route_iface->ip;
+
+      /* Target addr set to 00:00:00:00:00:00 */
+      memcpy(request_arp_hdr->ar_tha, blank_addr, ETHER_ADDR_LEN);
+      request_arp_hdr->ar_tip = htonl(arp_request_entry->ip);
+
+
+
+
+
+      printf("---------------- arppppppppppp ma nigga 2------------\n");
+      print_hdrs(request_arp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+/*    
+      printf("------------printing all headers, from eth packet request--------\n");
+      print_hdrs(eth_packet, len);
+
+      
+      printf("------------printing all headers, from arp packet request--------\n");
+      print_hdrs(request_arp_packet, len);
+      */
+
+      printf("Sending ARP request to %u.%u.%u.%u on %s\n", 
+        (arp_request_entry->ip >> 24) & 0xFF,
+        (arp_request_entry->ip >> 16) & 0xFF,
+        (arp_request_entry->ip >> 8) & 0xFF,
+        arp_request_entry->ip & 0xFF,
+        route_iface->name);
+
+      printf("---------------- begin SENDING, interface name: %s ------------\n", route_iface->name);
+      sr_send_packet(sr, request_arp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), route_iface->name);
+      free(request_arp_packet);
+
+      printf("---------------- DONE SENDING------------\n");
+
+
+      arp_request_entry->times_sent = 1;
+      arp_request_entry->sent = time(NULL);
+
+      /* free? */
+    }
+  }
+}
+
+
+
+
 
 
 
@@ -372,7 +485,6 @@ struct sr_rt* sr_get_ip_packet_route(struct sr_instance* sr, uint32_t dest_addr)
         == ((ntohl(route_walker->dest.s_addr)) & route_walker->mask.s_addr))
       {
         printf("---------- longest prefix match found ------------\n");
-        sr_print_routing_entry(route_walker);
         ret = route_walker;
         network_mask_length = get_mask_length(route_walker->mask.s_addr);
       }
@@ -397,84 +509,6 @@ int get_mask_length(uint32_t mask)
    }
    
    return ret;
-}
-
-void sr_send_packet_link_arp(struct sr_instance* sr, uint8_t * eth_packet,
-   unsigned int len, char* interface, struct sr_rt* route)
-{
-  sr_ethernet_hdr_t* packet = (sr_ethernet_hdr_t*) eth_packet;
-  uint32_t next_hop_ip_addr;
-  struct sr_arpentry* arp_entry;
-
-  printf("--------------arp dump-------------\n");
-  sr_arpcache_dump(&sr->cache);
-
-
-  printf("------------arp cahch lookup-------------\n");
-  /* Find gateway IP for arp cahce lookup */
-  next_hop_ip_addr = ntohl(route->gw.s_addr);
-  arp_entry = sr_arpcache_lookup(&sr->cache, next_hop_ip_addr);
-
-  if (arp_entry != NULL)
-  {
-    /* Arp cache found, send packet */
-    printf("------------arp cache found-------------\n");
-    memcpy(packet->ether_dhost, arp_entry->mac, ETHER_ADDR_LEN);
-    sr_send_packet(sr, (uint8_t*)packet, len, interface);
-    free(arp_entry);
-  }
-  else
-  {
-    /* Arp cache not found */
-    printf("----------arp cache NOT found---------\n");
-
-    struct sr_arpreq* arp_request_ptr = sr_arpcache_queuereq(
-      &sr->cache, next_hop_ip_addr, (uint8_t*)packet, len, interface);
-
-    if (arp_request_ptr->times_sent == -1)
-    {
-
-      struct sr_if* iface = sr_get_interface(sr, route->interface);
-
-      /* Contruct and send a new ARP request */
-      uint8_t* request_arp_packet = (uint8_t *) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
-      sr_ethernet_hdr_t* request_ethernet_hdr = (sr_ethernet_hdr_t*)request_arp_packet;
-      sr_arp_hdr_t* request_arp_hdr = (sr_arp_hdr_t*)(request_arp_packet + sizeof(sr_ethernet_hdr_t));
-
-      /* Ethernet header */
-      /* Destination addr is set to FF:FF:FF:FF:FF:FF */
-      memcpy(request_ethernet_hdr->ether_dhost, ethernet_broadcast_addr, ETHER_ADDR_LEN);
-      memcpy(request_ethernet_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
-      request_ethernet_hdr->ether_type = htons(ethertype_arp);
-
-      /* ARP Header */
-      request_arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
-      request_arp_hdr->ar_pro = htons(ethertype_ip);
-      request_arp_hdr->ar_hln = ETHER_ADDR_LEN;
-      request_arp_hdr->ar_pln = IP_ADDR_LEN;
-      request_arp_hdr->ar_op = htons(arp_op_request);
-      memcpy(request_arp_hdr->ar_sha, iface->addr, ETHER_ADDR_LEN);
-      request_arp_hdr->ar_sip = iface->ip;
-      /* Target addr set to 00:00:00:00:00:00 */
-      memcpy(request_arp_hdr->ar_tha, blank_addr, ETHER_ADDR_LEN);
-      request_arp_hdr->ar_tip = htonl(arp_request_ptr->ip);
-
-      /* print all headers */
-      printf("------------printing all headers, from eth packet request--------\n");
-      print_hdrs(eth_packet, len);
-
-      /* print all headers */
-      printf("------------printing all headers, from arp packet request--------\n");
-      print_hdrs(request_arp_packet, len);
-
-      printf("Sending ARP request to <IP ADDRESS>.\n");
-      arp_request_ptr->times_sent = 1;
-      arp_request_ptr->sent = time(NULL);
-
-      sr_send_packet(sr, arp_request_ptr, len, interface);
-    }
-  }
-
 }
 
 
