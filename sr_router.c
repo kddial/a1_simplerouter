@@ -31,6 +31,8 @@
 #define ICMP_ECHO_REQUEST (8)
 #define ICMP_ECHO_REPLY (0)
 static uint16_t id_counter = 0;
+static uint8_t ethernet_broadcast_addr[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static uint8_t blank_addr[ETHER_ADDR_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 /*---------------------------------------------------------------------
  * Method: sr_init(void)
@@ -423,7 +425,7 @@ void sr_send_packet_link_arp(struct sr_instance* sr, uint8_t * eth_packet,
   }
   else
   {
-    /* Arp cache not found, create an ARP request */
+    /* Arp cache not found */
     printf("----------arp cache NOT found---------\n");
 
     struct sr_arpreq* arp_request_ptr = sr_arpcache_queuereq(
@@ -431,11 +433,45 @@ void sr_send_packet_link_arp(struct sr_instance* sr, uint8_t * eth_packet,
 
     if (arp_request_ptr->times_sent == -1)
     {
-      /* New ARP request */
 
+      struct sr_if* iface = sr_get_interface(sr, route->interface);
 
+      /* Contruct and send a new ARP request */
+      uint8_t* request_arp_packet = (uint8_t *) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+      sr_ethernet_hdr_t* request_ethernet_hdr = (sr_ethernet_hdr_t*)request_arp_packet;
+      sr_arp_hdr_t* request_arp_hdr = (sr_arp_hdr_t*)(request_arp_packet + sizeof(sr_ethernet_hdr_t));
+
+      /* Ethernet header */
+      /* Destination addr is set to FF:FF:FF:FF:FF:FF */
+      memcpy(request_ethernet_hdr->ether_dhost, ethernet_broadcast_addr, ETHER_ADDR_LEN);
+      memcpy(request_ethernet_hdr->ether_shost, iface->addr, ETHER_ADDR_LEN);
+      request_ethernet_hdr->ether_type = htons(ethertype_arp);
+
+      /* ARP Header */
+      request_arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
+      request_arp_hdr->ar_pro = htons(ethertype_ip);
+      request_arp_hdr->ar_hln = ETHER_ADDR_LEN;
+      request_arp_hdr->ar_pln = IP_ADDR_LEN;
+      request_arp_hdr->ar_op = htons(arp_op_request);
+      memcpy(request_arp_hdr->ar_sha, iface->addr, ETHER_ADDR_LEN);
+      request_arp_hdr->ar_sip = iface->ip;
+      /* Target addr set to 00:00:00:00:00:00 */
+      memcpy(request_arp_hdr->ar_tha, blank_addr, ETHER_ADDR_LEN);
+      request_arp_hdr->ar_tip = htonl(arp_request_ptr->ip);
+
+      /* print all headers */
+      printf("------------printing all headers, from eth packet request--------\n");
+      print_hdrs(eth_packet, len);
+
+      /* print all headers */
+      printf("------------printing all headers, from arp packet request--------\n");
+      print_hdrs(request_arp_packet, len);
+
+      printf("Sending ARP request to <IP ADDRESS>.\n");
       arp_request_ptr->times_sent = 1;
       arp_request_ptr->sent = time(NULL);
+
+      sr_send_packet(sr, arp_request_ptr, len, interface);
     }
   }
 
