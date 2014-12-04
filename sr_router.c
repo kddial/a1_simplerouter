@@ -146,7 +146,7 @@ void sr_handle_arp_packet(struct sr_instance* sr,
   if (arp_hdr->ar_tip == iface->ip)
   {
 
-    /* ARP Request */
+    /* Received ARP Request */
     if (ntohs(arp_hdr->ar_op) == arp_op_request) 
     {
       /* Contruct ARP reply */
@@ -179,18 +179,30 @@ void sr_handle_arp_packet(struct sr_instance* sr,
       free(reply_arp_packet);
     }
 
-    /* ARP Reply */
+    /* Received ARP Reply */
     else if (ntohs(arp_hdr->ar_op) == arp_op_reply)
     {
       printf("Received ARP reply. \n");
       printf("-------------- needs testing.------------- \n");
 
+
+
+    /*sr_arpcache_dump(&sr->cache);*/
+      printf("-------------- arp cache split.------------- \n");
+
       /* Insert into ARP cache */
       struct sr_arpreq* request_pointer = sr_arpcache_insert(&sr->cache, 
-        arp_hdr->ar_sha, arp_hdr->ar_sip);
+        arp_hdr->ar_sha, ntohl(arp_hdr->ar_sip));
 
+
+    /*sr_arpcache_dump(&sr->cache);*/
+
+      printf("-------------- -----------------0  ------------- \n");
+      
       if (request_pointer != NULL)
       {
+
+        printf("-------------- request_pointer_ not null------------- \n");
 
         /* Send all oustanding packets from request */
         while (request_pointer != NULL)
@@ -218,6 +230,8 @@ void sr_handle_arp_packet(struct sr_instance* sr,
       {
         printf("Received ARP reply, missing associated ARP request.");
       }
+
+      printf("-------------- -----------------10  ------------- \n");
     }
   }
 }
@@ -376,6 +390,10 @@ void sr_send_packet_link_arp(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
   next_hop_ip_addr = ntohl(route->gw.s_addr);
   arp_entry = sr_arpcache_lookup(&sr->cache, next_hop_ip_addr);
 
+        printf(" --------$$$$$$$$$$$$$$$$--------- next hop address ----$$$$$$$$$$$$$$----\n");
+  print_addr_ip_int(route->gw.s_addr);
+  print_addr_ip_int(next_hop_ip_addr);
+
 
   if (arp_entry != NULL)
   {
@@ -457,8 +475,6 @@ void sr_send_packet_link_arp(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
 
       arp_request_entry->times_sent = 1;
       arp_request_entry->sent = time(NULL);
-
-      /* free? */
     }
   }
 }
