@@ -27,7 +27,7 @@ handle packet:
 						IP header
 						icmp header
 					- get_ip_route
-*					- send_packet_link_arp
+*!					- send_packet_link_arp
 			else
 *				// received non-icmp, send ICMP port unreachable
 				contruct ICMP port 3 not reachable reply
@@ -40,11 +40,11 @@ handle packet:
 			- forward to get_ip_route()
 	end ip
 
-*##
+*!!
 function get_ip_route():
 	longest prefix matching
 
-*##
+*!!
 function send_packet_link_arp():
 	check arp cache for mac to ip link
 	send packet to ip

@@ -225,120 +225,32 @@ results on router:
 log packets:
 ./sr -l log1.pcap
 
-ssh -X -p 8022 mininet@localhost
+ssh -Y -p 8022 mininet@localhost
 
 
 
 
 
+how to send udp packets:
+	help from site:
+	https://github.com/mininet/openflow-tutorial/wiki/Router-Exercise
 
+- ssh -Y -p 8022 mininet@localhost
+	- SSH with -Y or else the xterm consoles would not appear
+- run mininet
+- run pox
+- run your simple router
+- go back to mininet and run the following:
+	- mininet> xterm client server1
+		- two consolse should pop up
 
-Expected output from router3:
----------------------------------------------
-Router interfaces:
-eth3	HWaddre6:52:7e:62:42:c2
-	inet addr 10.0.1.1
-eth2	HWaddr3e:99:eb:c6:fc:61
-	inet addr 172.64.3.1
-eth1	HWaddr9e:da:ae:57:ad:bb
-	inet addr 192.168.2.1
- <-- Ready to process packets --> 
---------- 1000 HANDLE PACKET begin ---------
-ETHERNET header:
-	destination: FF:FF:FF:FF:FF:FF
-	source: 82:9D:C1:A3:4E:A1
-	type: 2054
-ARP header
-	hardware type: 1
-	protocol type: 2048
-	hardware address length: 6
-	protocol address length: 4
-	opcode: 1
-	sender hardware address: 82:9D:C1:A3:4E:A1
-	sender ip address: 10.0.1.100
-	target hardware address: 00:00:00:00:00:00
-	target ip address: 10.0.1.1
-Received ARP request. Sending ARP reply.
---------- 1000 HANDLE PACKET begin ---------
-ETHERNET header:
-	destination: E6:52:7E:62:42:C2
-	source: 82:9D:C1:A3:4E:A1
-	type: 2048
-IP header:
-	version: 4
-	header length: 5
-	type of service: 0
-	length: 84
-	id: 59342
-	fragment flag: DF
-	fragment offset: 0
-	TTL: 64
-	protocol: 1
-	checksum: 13720
-	source: 10.0.1.100
-	destination: 172.64.3.1
-ICMP header:
-	type: 8
-	code: 0
-	checksum: 3622
-Received ICMP echo request packet. Sending ICMP echo reply.
-ARPing 10.0.1.100 on eth3
-ARPing 10.0.1.100 on eth3
---------- 1000 HANDLE PACKET begin ---------
-ETHERNET header:
-	destination: E6:52:7E:62:42:C2
-	source: 82:9D:C1:A3:4E:A1
-	type: 2054
-ARP header
-	hardware type: 1
-	protocol type: 2048
-	hardware address length: 6
-	protocol address length: 4
-	opcode: 2
-	sender hardware address: 82:9D:C1:A3:4E:A1
-	sender ip address: 10.0.1.100
-	target hardware address: E6:52:7E:62:42:C2
-	target ip address: 10.0.1.1
--------------------- ARP CAHCE 900 --------------------
-Received ARP reply, sending all queued packets.
---------- 1000 HANDLE PACKET begin ---------
-ETHERNET header:
-	destination: E6:52:7E:62:42:C2
-	source: 82:9D:C1:A3:4E:A1
-	type: 2054
-ARP header
-	hardware type: 1
-	protocol type: 2048
-	hardware address length: 6
-	protocol address length: 4
-	opcode: 2
-	sender hardware address: 82:9D:C1:A3:4E:A1
-	sender ip address: 10.0.1.100
-	target hardware address: E6:52:7E:62:42:C2
-	target ip address: 10.0.1.1
--------------------- ARP CAHCE 900 --------------------
-Received ARP reply, but found no request.
+- server1 console (opens socket to receive udp packet stream):
+	> iperf -s -u
 
+- client console (send to stream):
+	> iperf -c 192.168.2.1 -u
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+- look at simple router output
 
 
 
