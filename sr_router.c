@@ -205,15 +205,18 @@ void sr_handle_arp_packet(struct sr_instance* sr,
         printf("-------------- request_pointer_ not null------------- \n");
 
         /* Send all oustanding packets from request */
-        while (request_pointer != NULL)
+        while (request_pointer->packets != NULL)
         {
+      printf("-------------- -----------------1 ------------- \n");
           /* Set new Ethernet frame destination address */
           struct sr_packet* current_packet = request_pointer->packets;
           memcpy(
             ((sr_ethernet_hdr_t*) current_packet->buf),
             arp_hdr->ar_sha, ETHER_ADDR_LEN);
 
+      printf("-------------- -----------------2  ------------- \n");
           sr_send_packet(sr, (uint8_t*)current_packet->buf, current_packet->len, current_packet->iface);
+      printf("-------------- -----------------3  ------------- \n");
 
            /* Iterate to the next packet */
           request_pointer->packets = request_pointer->packets->next;
