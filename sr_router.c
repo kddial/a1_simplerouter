@@ -92,7 +92,6 @@ void sr_handlepacket(struct sr_instance* sr,
   assert(interface);
 
   printf("*** -> Received packet of length %d \n",len);
-
   /* Error handling */
   if (len < sizeof(sr_ethernet_hdr_t))
   {
@@ -101,7 +100,6 @@ void sr_handlepacket(struct sr_instance* sr,
   }
 
   struct sr_if* iface = sr_get_interface(sr, interface);
-  
   if (iface == 0)
   {
     printf("Invalid interface, interface not found.\n");
@@ -117,11 +115,7 @@ void sr_handlepacket(struct sr_instance* sr,
   {
     sr_handle_ip_packet(sr, packet, len, interface, iface);
   }
-
-
 }/* end sr_ForwardPacket */
-
-
 
 
 
@@ -142,7 +136,6 @@ void sr_handle_arp_packet(struct sr_instance* sr,
   
   if (arp_hdr->ar_tip == iface->ip)
   {
-
     /* Received ARP Request */
     if (ntohs(arp_hdr->ar_op) == arp_op_request) 
     {
@@ -179,17 +172,13 @@ void sr_handle_arp_packet(struct sr_instance* sr,
     /* Received ARP Reply */
     else if (ntohs(arp_hdr->ar_op) == arp_op_reply)
     {
-      printf("Received ARP reply. \n");
-
       /* Insert into ARP cache */
+      printf("Received ARP reply. \n");
       struct sr_arpreq* request_pointer = sr_arpcache_insert(&sr->cache, 
         arp_hdr->ar_sha, ntohl(arp_hdr->ar_sip));
 
-      
       if (request_pointer != NULL)
       {
-
-
         /* Send all oustanding packets from request */
         while (request_pointer->packets != NULL)
         {
@@ -209,7 +198,6 @@ void sr_handle_arp_packet(struct sr_instance* sr,
           free(current_packet->iface);
           free(current_packet);
         }
-
         sr_arpreq_destroy(&sr->cache, request_pointer);
       }
       else
@@ -350,8 +338,7 @@ void sr_handle_ip_packet(struct sr_instance* sr,
     if (ip_packet->ip_ttl == 1)
     {
       /* Send TTL expired in transit */
-      sr_send_icmp_ttl_exp_packet(sr, ip_packet, 
-        len, interface);
+      sr_send_icmp_ttl_exp_packet(sr, ip_packet, len, interface);
       return;
     }
     else
@@ -363,7 +350,6 @@ void sr_handle_ip_packet(struct sr_instance* sr,
 
     /* Find forwarding route */
     struct sr_rt* forward_route = sr_get_ip_packet_route(sr, ntohl(ip_packet->ip_dst));
-
     if (forward_route == NULL)
     {
       /* Send ICMP type 3 packet */
@@ -374,7 +360,6 @@ void sr_handle_ip_packet(struct sr_instance* sr,
     else
     {
       printf("Forwarding packet from %s to %s.\n", interface, forward_route->interface);
-
       uint8_t* forward_packet = malloc(len);
       memcpy(forward_packet + sizeof(sr_ethernet_hdr_t), ip_packet, 
         len - sizeof(sr_ethernet_hdr_t));
@@ -392,7 +377,12 @@ void sr_handle_ip_packet(struct sr_instance* sr,
 }
 
 
-
+/*
+ * Send an IP packet by linking its phyical address using 
+ * the ARP cache. If the address is not found in the ARP cache
+ * mapping, we send a ARP request, where the outstanding packets 
+ * will resume sending once the ARP reply is received.
+ */
 void sr_send_ip_packet(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
    unsigned int len, char* interface, struct sr_rt* route)
 {
@@ -463,6 +453,11 @@ void sr_send_ip_packet(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
   }
 }
 
+/*
+ * Return a node in the routing table that best 
+ * matches the destination address using
+ * longest prefix match.
+ */
 struct sr_rt* sr_get_ip_packet_route(struct sr_instance* sr, uint32_t dest_addr)
 {
   struct sr_rt* route_walker = sr->routing_table;
@@ -502,6 +497,10 @@ int get_mask_length(uint32_t mask)
    return ret;
 }
 
+/**
+ * Send ICMP type 3 packet reply.
+ * ICMP code is passed in as an argument.
+ */
 void sr_send_icmp_t3_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
    unsigned int len, char* interface, int icmp_code)
 {
@@ -549,6 +548,9 @@ void sr_send_icmp_t3_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
   free(reply_packet);
 }
 
+/**
+ * Send ICMP packet reply saying that TTL has expired.
+ */
 void sr_send_icmp_ttl_exp_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
    unsigned int len, char* interface)
 {
