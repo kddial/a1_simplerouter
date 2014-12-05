@@ -531,13 +531,6 @@ sr_ether_addrs_match_interface( struct sr_instance* sr, /* borrowed */
     ether_hdr = (struct sr_ethernet_hdr*)buf;
     iface = sr_get_interface(sr, name);
 
-
-    printf("*******`*************** ether_header **************\n");
-    print_addr_eth(ether_hdr->ether_shost);
-    printf("********************** interface **************\n");
-    print_addr_eth(iface->addr);
-    sr_print_if(iface);
-
     if ( iface == 0 ){
         fprintf( stderr, "** Error, interface %s, does not exist\n", name);
         return 0;
