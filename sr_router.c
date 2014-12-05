@@ -272,11 +272,6 @@ void sr_handle_ip_packet(struct sr_instance* sr,
     }
   }
 
-  printf("------------------ -----------------0------------ ------------------\n");
-
-  printf("------------------ -----------------dest: %d------------ ------------------\n", destination_ip_belong_to_us);
-
-
   /* Received IP packet destined to us */
   if (destination_ip_belong_to_us == 1)
   {
@@ -351,7 +346,7 @@ void sr_handle_ip_packet(struct sr_instance* sr,
     if (ip_packet->ip_p != ip_protocol_icmp)
     {
       /* Handle non-ICMP packet */
-      printf("Received non-ICMP packet. Sending port unreachable.\n");
+      printf("Received non-ICMP packet. Sending port unreachable reply.\n");
 
       /* Send ICMP type 3 packet */
       sr_send_icmp_t3_packet(sr, ip_packet, 
@@ -361,7 +356,51 @@ void sr_handle_ip_packet(struct sr_instance* sr,
   /* Forward IP packet */
   else
   {
-    printf("------------------ dest is not us, need to forward IP packet------------\n");
+    printf("------------------$$$$ dest is not us, need to forward IP packet---$$$$$$$$$$---------\n");
+    printf("Received packet not destined to us. Begin to forward packet.\n");
+
+    /* Decrement TTL */
+    if (ip_packet->ip_ttl == 1)
+    {
+      /* Send TTL expired in transit */
+      printf("Packet's TTL expired in transit.\n");
+      printf("NEED TO IMPLEMENT\n");
+      return;
+    }
+    else
+    {
+      ip_packet->ip_ttl = ip_packet->ip_ttl - 1;
+      ip_packet->ip_sum = 0;
+      ip_packet->ip_sum = cksum(ip_packet, sizeof(sr_ip_hdr_t));
+    }
+
+    /* Find forwarding route */
+    struct sr_rt* forward_route = sr_get_ip_packet_route(sr, ntohl(ip_packet->ip_dst));
+
+    if (forward_route == NULL)
+    {
+      /* Send ICMP type 3 packet */
+      printf("Packet network is unreachable. Sending network unreachable reply.\n");
+      sr_send_icmp_t3_packet(sr, ip_packet, 
+        len, interface, ICMP_CODE_DEST_NETWORK_UNREACH);
+    }
+    else
+    {
+      printf("Forwarding packet from %s to %s.\n", interface, forward_route->interface);
+
+      uint8_t* forward_packet = malloc(len);
+      memcpy(forward_packet + sizeof(sr_ethernet_hdr_t), ip_packet, 
+        len - sizeof(sr_ethernet_hdr_t));
+
+      /* Send the forwading packet. */
+      sr_send_ip_packet(sr, 
+        (sr_ethernet_hdr_t*) forward_packet, len, 
+        forward_route->interface,
+        forward_route);
+
+      free(forward_packet);
+
+    }
 
 
 
@@ -389,11 +428,6 @@ void sr_send_ip_packet(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
   /* Find gateway IP for arp cahce lookup */
   next_hop_ip_addr = ntohl(route->gw.s_addr);
   arp_entry = sr_arpcache_lookup(&sr->cache, next_hop_ip_addr);
-
-        printf(" --------$$$$$$$$$$$$$$$$--------- next hop address ----$$$$$$$$$$$$$$----\n");
-  print_addr_ip_int(route->gw.s_addr);
-  print_addr_ip_int(next_hop_ip_addr);
-
 
   if (arp_entry != NULL)
   {
@@ -465,7 +499,8 @@ void sr_send_ip_packet(struct sr_instance* sr, sr_ethernet_hdr_t* packet,
         arp_request_entry->ip & 0xFF,
         route_iface->name);
 
-      printf("---------------- begin SENDING, interface name: %s ------------\n", route_iface->name);
+      printf("---------------- begin SENDING, interface source name: %s ------------\n", interface);
+      printf("---------------- begin SENDING, interface dest   name: %s ------------\n", route_iface->name);
       sr_send_packet(sr, request_arp_packet, sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t), route_iface->name);
       free(request_arp_packet);
 
@@ -492,9 +527,9 @@ struct sr_rt* sr_get_ip_packet_route(struct sr_instance* sr, uint32_t dest_addr)
 
   while (route_walker != NULL)
   {
-        printf("---------- while loop of route walker ------------\n");
+/*        printf("---------- while loop of route walker ------------\n");
         print_addr_ip_int(dest_addr);
-        print_addr_ip_int(route_walker->dest.s_addr);
+        print_addr_ip_int(route_walker->dest.s_addr);*/
 
     /* Find longest prefix match */
     if (get_mask_length(route_walker->mask.s_addr) > network_mask_length)
@@ -557,27 +592,11 @@ void sr_send_icmp_t3_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
   reply_ip_header->ip_dst = ip_packet->ip_src;
 
   /* Find IP destination interface */
-
-
-    print_hdr_ip(ip_packet);
-      printf("---------------- ip split ------------\n");
-    print_hdr_ip(reply_ip_header);
-
   struct sr_rt* dest_route = sr_get_ip_packet_route(sr, ntohl(reply_ip_header->ip_dst));
-  printf("--------------dest_rout: %s===------------\n", dest_route);
-
-      printf("---------------- t3  10  ------------\n");
-      print_addr_ip_int(ip_packet->ip_dst);
-      print_addr_ip_int(ntohl(ip_packet->ip_dst));
-      printf("---------------- t3  101, interface name: %s  ------------\n", dest_route->interface);
-
   struct sr_if* dest_if = sr_get_interface(sr, dest_route->interface);
-      printf("---------------- t3  11  ------------\n");
   reply_ip_header->ip_src = dest_if->ip;
-      printf("---------------- t3  12  ------------\n");
   reply_ip_header->ip_sum = cksum(reply_ip_header, sizeof(sr_ip_hdr_t));
 
-      printf("---------------- t3  13  ------------\n");
   /* ICMP header */
   reply_icmp_header->icmp_type = ICMP_UNREACHABLE;
   reply_icmp_header->icmp_code = icmp_code;
@@ -585,7 +604,6 @@ void sr_send_icmp_t3_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
   memcpy(reply_icmp_header->data, ip_packet, ICMP_DATA_SIZE);
   reply_icmp_header->icmp_sum = cksum(reply_icmp_header, sizeof(sr_icmp_t3_hdr_t));
 
-      printf("---------------- t3  2  ------------\n");
   /* Send reply packet */
   sr_send_ip_packet(sr, 
     (sr_ethernet_hdr_t*) reply_packet, 
@@ -593,9 +611,7 @@ void sr_send_icmp_t3_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
     interface,
     sr_get_ip_packet_route(sr, ntohl(reply_ip_header->ip_dst))
   );
-      printf("---------------- t3  3  ------------\n");
   free(reply_packet);
-      printf("---------------- t3  4  ------------\n");
 }
 
 

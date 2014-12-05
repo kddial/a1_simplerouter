@@ -1,6 +1,9 @@
 
 client ping -c 1 172.64.3.1
 
+
+IMPLEMENT ARP CACHE SWEEPING
+
 handle packet:
 	if packet == arp:
 		if arp_operation == request
@@ -9,7 +12,7 @@ handle packet:
 				send reply packet:
 					ethernet header
 					arp header
-*!		if arp_operation == reply
+		if arp_operation == reply
 			if arp->target ip == interface->ip
 				// this packet is a reply, save to arp_cahce, send outstanding packets
 
@@ -27,24 +30,37 @@ handle packet:
 						IP header
 						icmp header
 					- get_ip_route
-*!					- send_packet_link_arp
+					- send_packet_link_arp
 			else
-*				// received non-icmp, send ICMP port unreachable
+				// received non-icmp, send ICMP port unreachable
 				contruct ICMP port 3 not reachable reply
 				send packet:
 					- get_ip_route
 					- send_packet_link_arp
 		else
 			// forward ip packet
-*			- reduce TTL and break if 0
-			- forward to get_ip_route()
+
+			reduce ttl - 1
+				if ttl == 0?
+					break;
+			check routing table and perform LPM
+				no match?
+					send icmp net unreachable
+				match?
+					check arp_cache
+						miss?
+							send ARP request
+								if request is sent more then 5 times?
+									send ICMP host unreachable
+						hit?
+							send frame to next hop
+							reduce TTL
 	end ip
 
-*!!
+
 function get_ip_route():
 	longest prefix matching
 
-*!!
 function send_packet_link_arp():
 	check arp cache for mac to ip link
 	send packet to ip
