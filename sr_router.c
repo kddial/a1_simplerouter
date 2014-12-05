@@ -362,7 +362,6 @@ void sr_handle_ip_packet(struct sr_instance* sr,
     if (ip_packet->ip_ttl == 1)
     {
       /* Send TTL expired in transit */
-      printf("Packet's TTL expired in transit.\n");
       sr_send_icmp_ttl_exp_packet(sr, ip_packet, 
         len, interface);
       return;
