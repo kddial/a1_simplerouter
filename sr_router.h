@@ -29,7 +29,7 @@
 
 #define INIT_TTL 255
 #define PACKET_DUMP_SIZE 1024
-  
+
 #define ICMP_CODE_DEST_NETWORK_UNREACH (0)
 #define ICMP_CODE_DEST_HOST_UNREACH (1)
 #define ICMP_CODE_DEST_PORT_UNREACH (3)
@@ -77,6 +77,8 @@ void sr_send_ip_packet(struct sr_instance* sr, sr_ethernet_hdr_t * ,
    unsigned int len, char* interface, struct sr_rt* route);
 void sr_send_icmp_t3_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
    unsigned int len, char* interface, int icmp_code);
+void sr_send_icmp_ttl_exp_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
+   unsigned int len, char* interface);
 struct sr_rt* sr_get_ip_packet_route(struct sr_instance* sr, uint32_t dest_addr);
 int get_mask_length(uint32_t mask);
 

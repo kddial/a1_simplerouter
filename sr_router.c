@@ -31,6 +31,8 @@
 #define ICMP_ECHO_REQUEST (8)
 #define ICMP_ECHO_REPLY (0)
 #define ICMP_UNREACHABLE (3)
+#define ICMP_TIME_EXCEEDED (11)
+#define ICMP_TTL_EXPIRED (0)
 static uint16_t id_counter = 0;
 static uint8_t ethernet_broadcast_addr[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static uint8_t blank_addr[ETHER_ADDR_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
@@ -361,7 +363,8 @@ void sr_handle_ip_packet(struct sr_instance* sr,
     {
       /* Send TTL expired in transit */
       printf("Packet's TTL expired in transit.\n");
-      printf("NEED TO IMPLEMENT\n");
+      sr_send_icmp_ttl_exp_packet(sr, ip_packet, 
+        len, interface);
       return;
     }
     else
@@ -612,6 +615,53 @@ void sr_send_icmp_t3_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
 }
 
 
+void sr_send_icmp_ttl_exp_packet(struct sr_instance* sr, sr_ip_hdr_t* ip_packet,
+   unsigned int len, char* interface)
+{
+  printf("Received a packet that has been expired. Sending TTL expired in transit reply. ");
+  /* Construct reply packet */
+  uint8_t* reply_packet = malloc(sizeof(sr_ethernet_hdr_t) 
+    + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t));
+
+  sr_ip_hdr_t* reply_ip_header = (sr_ip_hdr_t*)(reply_packet + sizeof(sr_ethernet_hdr_t));
+  sr_icmp_t3_hdr_t* reply_icmp_header = (sr_icmp_t3_hdr_t*)(reply_packet 
+                                    + sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t));
+
+  /* IP header */
+  reply_ip_header->ip_v = ip_packet->ip_v;
+  reply_ip_header->ip_hl = ip_packet->ip_hl;
+  reply_ip_header->ip_tos = ip_packet->ip_tos;
+  reply_ip_header->ip_len = ip_packet->ip_len;
+  reply_ip_header->ip_id = htons(id_counter);
+  id_counter++;
+  reply_ip_header->ip_off = ip_packet->ip_off;
+  reply_ip_header->ip_ttl = TTL;
+  reply_ip_header->ip_p = ip_protocol_icmp;
+  reply_ip_header->ip_sum = 0;
+  reply_ip_header->ip_dst = ip_packet->ip_src;
+
+  /* Find IP destination interface */
+  struct sr_rt* dest_route = sr_get_ip_packet_route(sr, ntohl(reply_ip_header->ip_dst));
+  struct sr_if* dest_if = sr_get_interface(sr, dest_route->interface);
+  reply_ip_header->ip_src = dest_if->ip;
+  reply_ip_header->ip_sum = cksum(reply_ip_header, sizeof(sr_ip_hdr_t));
+
+  /* ICMP header */
+  reply_icmp_header->icmp_type = ICMP_TIME_EXCEEDED;
+  reply_icmp_header->icmp_code = ICMP_TTL_EXPIRED;
+  reply_icmp_header->icmp_sum = 0;
+  memcpy(reply_icmp_header->data, ip_packet, ICMP_DATA_SIZE);
+  reply_icmp_header->icmp_sum = cksum(reply_icmp_header, sizeof(sr_icmp_t3_hdr_t));
+
+  /* Send reply packet */
+  sr_send_ip_packet(sr, 
+    (sr_ethernet_hdr_t*) reply_packet, 
+    sizeof(sr_ethernet_hdr_t) + sizeof(sr_ip_hdr_t) + sizeof(sr_icmp_t3_hdr_t),
+    interface,
+    sr_get_ip_packet_route(sr, ntohl(reply_ip_header->ip_dst))
+  );
+  free(reply_packet);
+}
 
 
 
