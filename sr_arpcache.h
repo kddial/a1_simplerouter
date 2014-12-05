@@ -73,6 +73,7 @@
 
 #define SR_ARPCACHE_SZ    100  
 #define SR_ARPCACHE_TO    15.0
+#define SR_ARPCAHCE_MAX_TIMES_SENT  5
 
 struct sr_packet {
     uint8_t *buf;               /* A raw Ethernet frame, presumably with the dest MAC empty */
@@ -97,6 +98,7 @@ struct sr_arpreq {
                                    should update this. */
     struct sr_packet *packets;  /* List of pkts waiting on this req to finish */
     struct sr_arpreq *next;
+    char *req_iface;            /* Requested interface */
 };
 
 struct sr_arpcache {

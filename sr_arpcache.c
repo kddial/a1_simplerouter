@@ -11,13 +11,63 @@
 #include "sr_if.h"
 #include "sr_protocol.h"
 
+static uint8_t ethernet_broadcast_addr[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static uint8_t blank_addr[ETHER_ADDR_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
 /* 
   This function gets called every second. For each request sent out, we keep
   checking whether we should resend an request or destroy the arp request.
   See the comments in the header file for an idea of what it should look like.
 */
 void sr_arpcache_sweepreqs(struct sr_instance *sr) { 
-    /* Fill this in */
+    struct sr_arpreq* req;
+    struct sr_arpcache* cache = &sr->cache;
+
+    /* Iterate through all the arp request */
+    for (req = cache->requests; req != NULL; req = req->next)
+    {
+        printf("^^^^^^^^^^^^^^^^^^^^^arp cahce sweep^^^^^^^^^^^^^^^^^^^^\n");
+        if (req->times_sent >= SR_ARPCAHCE_MAX_TIMES_SENT)
+        {
+        }
+        else
+        {
+            /* Construct ARP request packet */
+            uint8_t* request_arp_packet = (uint8_t *) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
+            sr_ethernet_hdr_t* request_ethernet_hdr = (sr_ethernet_hdr_t*)request_arp_packet;
+            sr_arp_hdr_t* request_arp_hdr = (sr_arp_hdr_t*)(request_arp_packet + sizeof(sr_ethernet_hdr_t));
+            
+            struct sr_if* req_iface = sr_get_interface(sr, req->req_iface);
+
+
+            /* Ethernet header */
+            memcpy(request_ethernet_hdr->ether_dhost, ethernet_broadcast_addr, ETHER_ADDR_LEN);
+            memcpy(request_ethernet_hdr->ether_shost, req_iface->addr, ETHER_ADDR_LEN);
+            request_ethernet_hdr->ether_type = htons(ethertype_arp);
+
+            /* ARP Header */
+            request_arp_hdr->ar_hrd = htons(arp_hrd_ethernet);
+            request_arp_hdr->ar_pro = htons(ethertype_ip);
+            request_arp_hdr->ar_hln = ETHER_ADDR_LEN;
+            request_arp_hdr->ar_pln = IP_ADDR_LEN;
+            request_arp_hdr->ar_op = htons(arp_op_request);
+            memcpy(request_arp_hdr->ar_sha, req_iface->addr, ETHER_ADDR_LEN);
+            request_arp_hdr->ar_sip = req_iface->ip;
+
+            /* Target addr set to 00:00:00:00:00:00 */
+            memcpy(request_arp_hdr->ar_tha, blank_addr, ETHER_ADDR_LEN);
+            request_arp_hdr->ar_tip = htonl(req->ip);
+
+            sr_send_packet(sr, (uint8_t*)request_arp_packet, (sizeof(sr_ethernet_hdr_t) 
+                + sizeof(sr_arp_hdr_t)), req_iface->name);
+
+            free(request_arp_packet);
+
+            req->times_sent++;
+        }
+
+    }
+
 }
 
 /* You should not need to touch the rest of this code. */
@@ -78,6 +128,9 @@ struct sr_arpreq *sr_arpcache_queuereq(struct sr_arpcache *cache,
 
         /* Set times_sent to -1 as an indicator for a new arp request */
         req->times_sent = -1;
+
+        /* Set the requested interface for indication during arp request sweeping */
+        req->req_iface = iface;
     }
     
     /* Add the packet to the list of packets for this request */

@@ -29,6 +29,10 @@
 
 #define INIT_TTL 255
 #define PACKET_DUMP_SIZE 1024
+  
+#define ICMP_CODE_DEST_NETWORK_UNREACH (0)
+#define ICMP_CODE_DEST_HOST_UNREACH (1)
+#define ICMP_CODE_DEST_PORT_UNREACH (3)
 
 /* forward declare */
 struct sr_if;

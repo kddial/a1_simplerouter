@@ -31,9 +31,6 @@
 #define ICMP_ECHO_REQUEST (8)
 #define ICMP_ECHO_REPLY (0)
 #define ICMP_UNREACHABLE (3)
-#define ICMP_CODE_DEST_NETWORK_UNREACH (0)
-#define ICMP_CODE_DEST_HOST_UNREACH (1)
-#define ICMP_CODE_DEST_PORT_UNREACH (3)
 static uint16_t id_counter = 0;
 static uint8_t ethernet_broadcast_addr[ETHER_ADDR_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static uint8_t blank_addr[ETHER_ADDR_LEN] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
