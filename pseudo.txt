@@ -1,8 +1,8 @@
 
 client ping -c 1 172.64.3.1
+client traceroute -n 172.64.3.10
+client wget http://192.168.2.2
 
-
-IMPLEMENT ARP CACHE SWEEPING
 
 handle packet:
 	if packet == arp:
