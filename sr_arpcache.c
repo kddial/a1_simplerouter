@@ -23,16 +23,27 @@ void sr_arpcache_sweepreqs(struct sr_instance *sr) {
     struct sr_arpreq* req;
     struct sr_arpcache* cache = &sr->cache;
 
-    /* Iterate through all the arp request */
+    /* Iterate through all the ARP request */
     for (req = cache->requests; req != NULL; req = req->next)
     {
-        printf("^^^^^^^^^^^^^^^^^^^^^arp cahce sweep^^^^^^^^^^^^^^^^^^^^\n");
         if (req->times_sent >= SR_ARPCAHCE_MAX_TIMES_SENT)
         {
+            /* Destroy arp request */
+            struct sr_packet* req_packet;
+
+            for (req_packet = req->packets; req_packet != NULL ; req_packet = req_packet->next)
+            {
+
+            sr_send_icmp_t3_packet(sr, 
+                (sr_ip_hdr_t*) (req_packet->buf + sizeof(sr_ethernet_hdr_t)), 
+                req_packet->len, req_packet->iface, ICMP_CODE_DEST_HOST_UNREACH);
+            }
+            sr_arpreq_destroy(cache, req);
+
         }
         else
         {
-            /* Construct ARP request packet */
+            /* Construct and send ARP request packet */
             uint8_t* request_arp_packet = (uint8_t *) malloc(sizeof(sr_ethernet_hdr_t) + sizeof(sr_arp_hdr_t));
             sr_ethernet_hdr_t* request_ethernet_hdr = (sr_ethernet_hdr_t*)request_arp_packet;
             sr_arp_hdr_t* request_arp_hdr = (sr_arp_hdr_t*)(request_arp_packet + sizeof(sr_ethernet_hdr_t));
